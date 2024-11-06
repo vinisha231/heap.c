@@ -2,8 +2,6 @@
  * This is a C implementation of malloc( ) and free( ), based on the buddy
  * memory allocation algorithm.
  *
- * Rename this file to heap.c before adding your comments
- *
  * Compile: gcc heap.c driver_cpg.c
  * Execute: ./a.out
  *
@@ -33,7 +31,6 @@ int mcb_total = 512;         // # MCB entries: 2^9 = 512 entries
  * @return array index.
  */
 int m2a(int sram_addr) { //stands for memory address to array_index 
-  // TODO(student): add comment to each of the following line of code
   int index = sram_addr - 0x20000000;   //calculate index by subtracting the base SRAM address (0x20000000) 
   return index; //returning the calculated index 
 }//closing of m2a(int sram_addr) method
@@ -44,7 +41,6 @@ int m2a(int sram_addr) { //stands for memory address to array_index
  * @return the corresponding Cortex-M's SRAM address in an integer.
  */
 int a2m(int array_index) { // stands for array_index to memory address 
-  //  TODO(student): add comment to each of the following line of code
   return array_index + 0x20000000; //Convert index of array back to memory address by adding base SRAM address (0x20000000)
 }//closing of a2m(int array_index) method 
 
@@ -54,7 +50,6 @@ int a2m(int array_index) { // stands for array_index to memory address
  */
 void printArray() {
   printf("memory ............................\n");
-  // TODO(student): add comment to each of the following line of code
   for (int i = 0; i < 0x8000; i += 4) { //Loops over entire array every 4 bytes 
     if (a2m(i) >= 0x20006800) { // checking the first half of the four half segment 
     // index converted into memory address is greater than the mcb_top or top of memory control block 
@@ -123,7 +118,6 @@ void printMemory() {
  */
 void *_ralloc(int size, int left_mcb_addr, int right_mcb_addr) {
   // initial parameter computation
-  //  TODO(student): add comment to each of the following line of code
   int entire_mcb_addr_space = right_mcb_addr - left_mcb_addr + mcb_ent_sz; // Calculates the total address space for MCBs from left to right boundaries, including one MCB entry size
   int half_mcb_addr_space = entire_mcb_addr_space / 2; //Calculate half of the total MCB address space for dividing the memory block in half
   int midpoint_mcb_addr = left_mcb_addr + half_mcb_addr_space; // Calculate the midpoint MCB address, representing the middle of the left and right MCB range
@@ -132,7 +126,6 @@ void *_ralloc(int size, int left_mcb_addr, int right_mcb_addr) {
   int act_half_heap_size = half_mcb_addr_space * 16; //// Calculate the actual half heap size, which represents half of the entire heap size
 
   // base case
-  //  TODO(student): add comment to each of the following line of code
   if (size <= act_half_heap_size) { //checking if requested size fits in the half heap size
     void *heap_addr = _ralloc(size, left_mcb_addr, midpoint_mcb_addr - mcb_ent_sz); //// Recursively attempt to allocate in the left half (smaller partition)
     if (heap_addr == 0) { // checking if allocation failed in the left half
@@ -163,7 +156,6 @@ void *_ralloc(int size, int left_mcb_addr, int right_mcb_addr) {
  * @return the same as the mcb_addr argument in success, otherwise 0.
  */
 int _rfree(int mcb_addr) {
-  //  TODO(student): add comment to each of the following line of code
   short mcb_contents = *(short *)&array[m2a(mcb_addr)]; // Retrieve the contents of the MCB (memory control block) at the given address
   int mcb_index = mcb_addr - mcb_top; // Calculate the MCB index relative to the starting MCB address
   short mcb_disp = (mcb_contents /= 16);// Calculate displacement (size in 16-byte units) of the MCB contents by dividing by 16
@@ -172,7 +164,6 @@ int _rfree(int mcb_addr) {
   // mcb_addr's used bit was cleared
   *(short *)&array[m2a(mcb_addr)] = mcb_contents; //this bit is now marked as free I think 
 
-  //  TODO(student): add comment to each of the following line of code
   if ((mcb_index / mcb_disp) % 2 == 0) { // Clear the used bit for this MCB, marking it as free
     if (mcb_addr + mcb_disp >= mcb_bot) { //// Check if the current MCB index and its displacement point to an even location
       return 0; // my buddy is beyond mcb_bot!
@@ -211,7 +202,6 @@ int _rfree(int mcb_addr) {
  * driver.c's main( ).
  */
 void _kinit() {
-  //  TODO(student): add comment to each of the following line of code
   for (int i = 0x20001000; i < 0x20005000; i++) { // Initialize memory array from address 0x20001000 to 0x20005000 
     array[m2a(i)] = 0; //store all elements of array to zero
   }// closing of for loop 
@@ -238,7 +228,6 @@ void *_kalloc(int size) { return _ralloc(size, mcb_top, mcb_bot); } // Calls the
  * @return the address of this deallocated space.
  */
 void *_kfree(void *ptr) {
-  //  TODO(student): add comment to each of the following line of code
   int addr = (int)ptr; // Cast the pointer to an integer address for calculations
 
   if (addr < heap_top || addr > heap_bot) { //Check if the address is within the bounds of the heap
