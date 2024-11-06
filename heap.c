@@ -1,4 +1,4 @@
-
+/*
  * This is a C implementation of malloc( ) and free( ), based on the buddy
  * memory allocation algorithm.
  *
@@ -98,11 +98,10 @@ void printMemory() {
   }//end of for loop 
   printf("mcb\t\tmcb Address\tHeap Address\tUsed?\tmcb Value\n");  //prints out header line for a table of memory control block (MCB) information
   for (int addr = heap_top; addr < heap_bot; addr += segment_size) { //iterates over a range of addresses in the heap  
-    int mcb_addr = mcb_top + (addr - heap_top) / 16;
-    int mcb_index = (mcb_addr - mcb_top) / mcb_ent_sz;
-    int heap_value = *(short *)&array[m2a(mcb_addr)];
-    printf("mcb[%3d]\t%x\t%x\t%3c\t%4d\n", mcb_index, mcb_addr, addr,
-           memory[m2a(addr)], heap_value);
+    int mcb_addr = mcb_top + (addr - heap_top) / 16; //calculates the address of the memory block in heap
+    int mcb_index = (mcb_addr - mcb_top) / mcb_ent_sz;//calculates the index of the memory block in heap 
+    int heap_value = *(short *)&array[m2a(mcb_addr)];//calculates the value of the heap (not sure if this is unused) 
+    printf("mcb[%3d]\t%x\t%x\t%3c\t%4d\n", mcb_index, mcb_addr, addr, memory[m2a(addr)], heap_value); //prints out the values of the memory address, memory index and value of the heap. 
   }
 }
 
@@ -125,36 +124,35 @@ void printMemory() {
 void *_ralloc(int size, int left_mcb_addr, int right_mcb_addr) {
   // initial parameter computation
   //  TODO(student): add comment to each of the following line of code
-  int entire_mcb_addr_space = right_mcb_addr - left_mcb_addr + mcb_ent_sz;
-  int half_mcb_addr_space = entire_mcb_addr_space / 2;
-  int midpoint_mcb_addr = left_mcb_addr + half_mcb_addr_space;
-  int heap_addr = 0;
-  int act_entire_heap_size = entire_mcb_addr_space * 16;
-  int act_half_heap_size = half_mcb_addr_space * 16;
+  int entire_mcb_addr_space = right_mcb_addr - left_mcb_addr + mcb_ent_sz; // Calculates the total address space for MCBs from left to right boundaries, including one MCB entry size
+  int half_mcb_addr_space = entire_mcb_addr_space / 2; //Calculate half of the total MCB address space for dividing the memory block in half
+  int midpoint_mcb_addr = left_mcb_addr + half_mcb_addr_space; // Calculate the midpoint MCB address, representing the middle of the left and right MCB range
+  int heap_addr = 0; //initializing the heap address to 0 here, this heap_ addr stores the allocated heap address if found
+  int act_entire_heap_size = entire_mcb_addr_space * 16; //// Calculate the actual entire heap size corresponding to the MCB address space (multiply by 16 for byte size)
+  int act_half_heap_size = half_mcb_addr_space * 16; //// Calculate the actual half heap size, which represents half of the entire heap size
 
   // base case
   //  TODO(student): add comment to each of the following line of code
-  if (size <= act_half_heap_size) {
-    void *heap_addr =
-        _ralloc(size, left_mcb_addr, midpoint_mcb_addr - mcb_ent_sz);
-    if (heap_addr == 0) {
-      return _ralloc(size, midpoint_mcb_addr, right_mcb_addr);
-    }
-    if ((array[m2a(midpoint_mcb_addr)] & 0x01) == 0) {
-      *(short *)&array[m2a(midpoint_mcb_addr)] = act_half_heap_size;
-    }
-    return heap_addr;
+  if (size <= act_half_heap_size) { //checking if requested size fits in the half heap size
+    void *heap_addr = _ralloc(size, left_mcb_addr, midpoint_mcb_addr - mcb_ent_sz); //// Recursively attempt to allocate in the left half (smaller partition)
+    if (heap_addr == 0) { // checking if allocation failed in the left half
+      return _ralloc(size, midpoint_mcb_addr, right_mcb_addr); //if so, trying to allocate in the right half
+    }// closing of if-block
+    if ((array[m2a(midpoint_mcb_addr)] & 0x01) == 0) { //If the right half's MCB at midpoint is unused (checked by & 0x01 == 0)
+      *(short *)&array[m2a(midpoint_mcb_addr)] = act_half_heap_size; //Set the size of the MCB at midpoint to the half heap size
+    }// closing of if block 
+    return heap_addr;// Return the allocated heap address
   }
   // (size > act_half_heap_size)
-  if ((array[m2a(left_mcb_addr)] & 0x01) != 0) {
-    return 0;
-  }
-  if (*(short *)&array[m2a(left_mcb_addr)] < act_entire_heap_size) {
-    return 0;
-  }
-  *(short *)&array[m2a(left_mcb_addr)] = act_entire_heap_size | 0x01;
-  return (void *)(heap_top + (left_mcb_addr - mcb_top) * 16);
-}
+  if ((array[m2a(left_mcb_addr)] & 0x01) != 0) { // Check if the left MCB is already marked as used (non-zero in the used flag)
+    return 0;// If the MCB is used, return 0 indicating allocation failure
+  }// closing of if block 
+  if (*(short *)&array[m2a(left_mcb_addr)] < act_entire_heap_size) { // Checking if the size of the memory block at left MCB is less than the required size
+    return 0; // Check if the size of the memory block at left MCB is less than the required size
+  }// closing of if block 
+  *(short *)&array[m2a(left_mcb_addr)] = act_entire_heap_size | 0x01; // Mark the MCB at left_mcb_addr as used by setting the size and the used flag (| 0x01)
+  return (void *)(heap_top + (left_mcb_addr - mcb_top) * 16); // Return the pointer to the start of the allocated memory in the heap
+} //closing of method.
 
 /*
  * _rfree is _kfree's helper function that is recursively called to
@@ -166,46 +164,46 @@ void *_ralloc(int size, int left_mcb_addr, int right_mcb_addr) {
  */
 int _rfree(int mcb_addr) {
   //  TODO(student): add comment to each of the following line of code
-  short mcb_contents = *(short *)&array[m2a(mcb_addr)];
-  int mcb_index = mcb_addr - mcb_top;
-  short mcb_disp = (mcb_contents /= 16);
-  short my_size = (mcb_contents *= 16);
+  short mcb_contents = *(short *)&array[m2a(mcb_addr)]; // Retrieve the contents of the MCB (memory control block) at the given address
+  int mcb_index = mcb_addr - mcb_top; // Calculate the MCB index relative to the starting MCB address
+  short mcb_disp = (mcb_contents /= 16);// Calculate displacement (size in 16-byte units) of the MCB contents by dividing by 16
+  short my_size = (mcb_contents *= 16);// Calculate the actual size of the memory block managed by this MCB (revert to original scale)
 
   // mcb_addr's used bit was cleared
-  *(short *)&array[m2a(mcb_addr)] = mcb_contents;
+  *(short *)&array[m2a(mcb_addr)] = mcb_contents; //this bit is now marked as free I think 
 
   //  TODO(student): add comment to each of the following line of code
-  if ((mcb_index / mcb_disp) % 2 == 0) {
-    if (mcb_addr + mcb_disp >= mcb_bot) {
+  if ((mcb_index / mcb_disp) % 2 == 0) { // Clear the used bit for this MCB, marking it as free
+    if (mcb_addr + mcb_disp >= mcb_bot) { //// Check if the current MCB index and its displacement point to an even location
       return 0; // my buddy is beyond mcb_bot!
     }
-    short mcb_buddy = *(short *)&array[m2a(mcb_addr + mcb_disp)];
-    if ((mcb_buddy & 0x0001) == 0) {
-      mcb_buddy = (mcb_buddy / 32) * 32;
-      if (mcb_buddy == my_size) {
-        *(short *)&array[m2a(mcb_addr + mcb_disp)] = 0;
-        my_size *= 2;
-        *(short *)&array[m2a(mcb_addr)] = my_size;
-        return _rfree(mcb_addr);
-      }
-    }
-  } else {
-    if (mcb_addr - mcb_disp < mcb_top) {
+    short mcb_buddy = *(short *)&array[m2a(mcb_addr + mcb_disp)]; // Retrieve contents of the "buddy" MCB to check its status
+    if ((mcb_buddy & 0x0001) == 0) {// If the buddy MCB is free (not in use)
+      mcb_buddy = (mcb_buddy / 32) * 32;// Clear the used bit of the buddy MCB 
+      if (mcb_buddy == my_size) {//checking if it matches the size of this block
+        *(short *)&array[m2a(mcb_addr + mcb_disp)] = 0; // Clear the buddy MCB and combine with this block
+        my_size *= 2; //double the size  
+        *(short *)&array[m2a(mcb_addr)] = my_size; //mark as free
+        return _rfree(mcb_addr); // Recursively attempt to free the combined block
+      }//closing of if-block
+    }//closing of nested if-blcok 
+  } else { 
+    if (mcb_addr - mcb_disp < mcb_top) { // If the buddy MCB is in an odd position, check if it's within bounds on the lower side
       return 0; // my buddy is below mcb_top!
-    }
-    short mcb_buddy = *(short *)&array[m2a(mcb_addr - mcb_disp)];
-    if ((mcb_buddy & 0x0001) == 0) {
-      mcb_buddy = (mcb_buddy / 32) * 32;
-      if (mcb_buddy == my_size) {
-        *(short *)&array[m2a(mcb_addr)] = 0;
-        my_size *= 2;
-        *(short *)&array[m2a(mcb_addr - mcb_disp)] = my_size;
-        return _rfree(mcb_addr - mcb_disp);
-      }
-    }
-  }
-  return mcb_addr;
-}
+    } //closing of if-block 
+    short mcb_buddy = *(short *)&array[m2a(mcb_addr - mcb_disp)]; // Retrieve the contents of the left-side buddy MCB
+    if ((mcb_buddy & 0x0001) == 0) { // Check if the left-side buddy is free
+      mcb_buddy = (mcb_buddy / 32) * 32; // Clear the used bit of the buddy and compare its size with the current block's size
+      if (mcb_buddy == my_size) { //if it matches the size of this block 
+        *(short *)&array[m2a(mcb_addr)] = 0; // Clear this MCB and combine with the buddy
+        my_size *= 2; //double the size  
+        *(short *)&array[m2a(mcb_addr - mcb_disp)] = my_size;//mark as free
+        return _rfree(mcb_addr - mcb_disp); //// Recursively free the combined block
+      }//closing of if block
+    }//closing of nested if block 
+  } //closing of else block 
+  return mcb_addr; // Return the current MCB address after free operation
+} //closing of method 
 
 /*
  * Initializes MCB entries. In step 2's assembly coding, this routine must
@@ -214,16 +212,16 @@ int _rfree(int mcb_addr) {
  */
 void _kinit() {
   //  TODO(student): add comment to each of the following line of code
-  for (int i = 0x20001000; i < 0x20005000; i++) {
-    array[m2a(i)] = 0;
-  }
+  for (int i = 0x20001000; i < 0x20005000; i++) { // Initialize memory array from address 0x20001000 to 0x20005000 
+    array[m2a(i)] = 0; //store all elements of array to zero
+  }// closing of for loop 
 
-  *(short *)&array[m2a(mcb_top)] = max_size;
-  for (int i = 0x20006802; i < 0x20006C00; i += 2) {
-    array[m2a(i)] = 0;
-    array[m2a(i + 1)] = 0;
-  }
-}
+  *(short *)&array[m2a(mcb_top)] = max_size; // Set the initial size of the MCB at the top address to the maximum size
+  for (int i = 0x20006802; i < 0x20006C00; i += 2) {  // Initialize additional memory area from 0x20006802 to 0x20006C00 
+    array[m2a(i)] = 0; //storing elements of array to zero in 2-byte increments
+    array[m2a(i + 1)] = 0; //storing nighbour of array to zero in 2-byte increments
+  }//closing of for loop 
+}// closing of method 
 
 /*
  * Step 2 should call _kalloc from SVC_Handler.
@@ -231,7 +229,7 @@ void _kinit() {
  * @param  the size of a requested memory space
  * @return a pointer to the allocated space
  */
-void *_kalloc(int size) { return _ralloc(size, mcb_top, mcb_bot); }
+void *_kalloc(int size) { return _ralloc(size, mcb_top, mcb_bot); } // Calls the `_ralloc` function to allocate memory with the specified size
 
 /*
  * Step 2 should call _kfree from SVC_Handler.
@@ -241,17 +239,17 @@ void *_kalloc(int size) { return _ralloc(size, mcb_top, mcb_bot); }
  */
 void *_kfree(void *ptr) {
   //  TODO(student): add comment to each of the following line of code
-  int addr = (int)ptr;
+  int addr = (int)ptr; // Cast the pointer to an integer address for calculations
 
-  if (addr < heap_top || addr > heap_bot) {
-    return NULL;
-  }
-  int mcb_addr = mcb_top + (addr - heap_top) / 16;
+  if (addr < heap_top || addr > heap_bot) { //Check if the address is within the bounds of the heap
+    return NULL; //return NULL if not
+  }//closing of if-block
+  int mcb_addr = mcb_top + (addr - heap_top) / 16; //Calculate the MCB address based on the address
 
-  if (_rfree(mcb_addr) == 0) {
-    return NULL;
-  }
-  return ptr;
+  if (_rfree(mcb_addr) == 0) {// Attempt to free the memory
+    return NULL;//return NULL if freeing fails
+  }//closing of if-block
+  return ptr; // Return the original pointer on successful free operation
 }
 
 /*
@@ -262,13 +260,13 @@ void *_kfree(void *ptr) {
  * @return a pointer to the allocated space
  */
 void *_malloc(int size) {
-  assert(size >= min_size);
-  static int init = 0;
-  if (init == 0) {
-    init = 1;
-    _kinit();
-  }
-  return _kalloc(size);
+  assert(size >= min_size); // Assert to ensure the size is at least the minimum required size
+  static int init = 0; // Static variable to ensure initialization happens only once
+  if (init == 0) {// If not initialized
+    init = 1; //changing variable to 1 
+    _kinit(); //initialize the memory using _kinit
+  }//closing of if-block
+  return _kalloc(size); //Allocate memory with the given size and return the pointer
 }
 
 /*
@@ -278,4 +276,4 @@ void *_malloc(int size) {
  * @param  a pointer to the memory space to be deallocated.
  * @return the address of this deallocated space.
  */
-void *_free(void *ptr) { return _kfree(ptr); }
+void *_free(void *ptr) { return _kfree(ptr); } // Free the specified pointer by calling `_kfree` and return the result
